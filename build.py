@@ -238,7 +238,6 @@ def layout(
   <link rel="stylesheet" href="/assets/css/blog.css">
 </head>
 <body>
-  <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/">
@@ -252,7 +251,7 @@ def layout(
       </nav>
     </div>
   </header>
-  <main class="site-main" id="content">
+  <main class="site-main">
     {body}
   </main>
   <footer class="site-footer">
@@ -290,7 +289,7 @@ def card_html(p: dict) -> str:
         meta_bits.append(str(p["city"]))
     meta = " · ".join(html.escape(x) for x in meta_bits)
     img = (
-        f'<img class="post-card-cover" src="{html.escape(cover)}" alt="{title}" loading="lazy" width="640" height="400">'
+        f'<img class="post-card-cover" src="{html.escape(cover)}" alt="{title}" loading="lazy">'
         if cover
         else '<div class="post-card-cover" aria-hidden="true"></div>'
     )
