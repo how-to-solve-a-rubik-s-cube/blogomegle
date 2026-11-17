@@ -341,6 +341,17 @@ img { max-width: 100%; height: auto; display: block; }
   line-height: 1.75;
 }
 .post-body p { margin: 0 0 1.1rem; }
+.post-body ul { margin: 0 0 1.1rem 1.2rem; }
+.post-body li { margin: 0.35rem 0; }
+.table-wrap { overflow-x: auto; margin: 0 0 1.25rem; }
+.post-body table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.post-body th, .post-body td {
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+.post-body th { background: rgba(107, 24, 56, 0.08); font-size: 0.82rem; }
 .post-body h2 {
   font-family: var(--serif);
   font-size: 1.35rem;

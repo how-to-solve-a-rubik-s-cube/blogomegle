@@ -86,13 +86,60 @@ def md_to_html(md: str) -> str:
         )
         return s
 
-    for line in lines:
+    in_list = False
+
+    def close_list():
+        nonlocal in_list
+        if in_list:
+            out.append("</ul>")
+            in_list = False
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("|") and i + 1 < len(lines) and re.match(r"^\s*\|?\s*:?-{3,}", lines[i + 1]):
+            flush_para()
+            close_list()
+            if in_quote:
+                out.append("</blockquote>")
+                in_quote = False
+            header = [c.strip() for c in line.strip().strip("|").split("|")]
+            i += 2
+            rows = []
+            while i < len(lines) and lines[i].startswith("|"):
+                rows.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
+                i += 1
+            head_html = "".join(f"<th>{inline(c)}</th>" for c in header)
+            body_rows = []
+            for row in rows:
+                body_rows.append("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in row) + "</tr>")
+            out.append(
+                '<div class="table-wrap"><table><thead><tr>'
+                + head_html
+                + "</tr></thead><tbody>"
+                + "".join(body_rows)
+                + "</tbody></table></div>"
+            )
+            continue
+        if line.startswith("- "):
+            flush_para()
+            if in_quote:
+                out.append("</blockquote>")
+                in_quote = False
+            if not in_list:
+                out.append("<ul>")
+                in_list = True
+            out.append(f"<li>{inline(line[2:].strip())}</li>")
+            i += 1
+            continue
+        close_list()
         if line.startswith("## "):
             flush_para()
             if in_quote:
                 out.append("</blockquote>")
                 in_quote = False
             out.append(f"<h2>{inline(line[3:].strip())}</h2>")
+            i += 1
             continue
         if line.startswith("# "):
             flush_para()
@@ -100,6 +147,7 @@ def md_to_html(md: str) -> str:
                 out.append("</blockquote>")
                 in_quote = False
             out.append(f"<h2>{inline(line[2:].strip())}</h2>")
+            i += 1
             continue
         if line.startswith("> "):
             flush_para()
@@ -107,18 +155,22 @@ def md_to_html(md: str) -> str:
                 out.append("<blockquote>")
                 in_quote = True
             out.append(f"<p>{inline(line[2:].strip())}</p>")
+            i += 1
             continue
         if not line.strip():
             flush_para()
             if in_quote:
                 out.append("</blockquote>")
                 in_quote = False
+            i += 1
             continue
         if in_quote and not line.startswith(">"):
             out.append("</blockquote>")
             in_quote = False
         buf.append(line.strip())
+        i += 1
     flush_para()
+    close_list()
     if in_quote:
         out.append("</blockquote>")
     return "\n".join(out)
@@ -246,6 +298,7 @@ def layout(
       </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="/stories/">Stories</a>
+        <a href="/guides/">Guides</a>
         <a href="/about/">About</a>
         <a class="nav-cta" href="{CHAT_URL}" data-cta="chat" data-cta-placement="header">Start chat</a>
       </nav>
@@ -264,6 +317,7 @@ def layout(
         <a href="{MAIN_SITE}">omeglechat.love</a>
         <a href="{CHAT_URL}">Start chat</a>
         <a href="/about/">About</a>
+        <a href="/guides/">Guides</a>
         <a href="/stories/">Stories</a>
       </div>
     </div>
@@ -519,10 +573,119 @@ def write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def load_guides() -> list[dict]:
+    folder = ROOT / "_guides"
+    if not folder.exists():
+        return []
+    guides = []
+    today = date.today()
+    for path in sorted(folder.glob("*.md")):
+        meta, body = parse_front_matter(path.read_text(encoding="utf-8"))
+        if not meta.get("title"):
+            continue
+        d = parse_date(meta.get("date") or path.name[:10])
+        if d > today:
+            continue
+        slug = slugify(str(meta.get("slug") or path.stem))
+        guides.append(
+            {
+                **meta,
+                "date": d,
+                "slug": slug,
+                "permalink": f"/guides/{slug}/",
+                "minutes": max(1, round(len(re.findall(r"[A-Za-z0-9']+", body)) / 220)),
+                "body_html": md_to_html(body),
+            }
+        )
+    guides.sort(key=lambda g: g["date"], reverse=True)
+    return guides
+
+
+def build_guide(g: dict) -> str:
+    crumbs = [("Home", "/"), ("Guides", "/guides/"), (str(g["title"]), g["permalink"])]
+    canon = SITE_URL.rstrip("/") + g["permalink"]
+    article_ld = {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": str(g["title"]),
+        "description": clip(str(g.get("excerpt") or SITE_DESC)),
+        "datePublished": g["date"].isoformat(),
+        "dateModified": g["date"].isoformat(),
+        "inLanguage": "en",
+        "articleSection": "Guide",
+        "mainEntityOfPage": canon,
+        "url": canon,
+        "author": {"@type": "Organization", "name": "OmegleChat editors"},
+        "publisher": {"@type": "Organization", "name": "omeglechat.love", "url": MAIN_SITE},
+    }
+    body = f"""
+<article class="post-page container-narrow">
+  {crumb_html(crumbs)}
+  <p class="post-kicker">Guide</p>
+  <header class="post-header">
+    <h1>{html.escape(str(g['title']))}</h1>
+    <div class="post-meta">
+      <time datetime="{g['date'].isoformat()}">{g['date'].strftime('%b %d, %Y')}</time>
+      <span class="sep" aria-hidden="true">·</span>
+      <span>{g['minutes']} min read</span>
+    </div>
+  </header>
+  <div class="post-body">
+    {g['body_html']}
+  </div>
+  <aside class="chat-cta-box">
+    <h2>Start on OmegleChat</h2>
+    <p>One stranger. Text, voice, or video. No signup. Adults only.</p>
+    <a class="btn btn-primary" href="{CHAT_URL}">Start a free chat</a>
+  </aside>
+</article>
+"""
+    return layout(
+        str(g["title"]),
+        body,
+        description=str(g.get("excerpt") or SITE_DESC),
+        canonical=g["permalink"],
+        og_type="article",
+        json_ld=[article_ld, breadcrumb(crumbs)],
+    )
+
+
+def build_guide_index(guides: list[dict]) -> str:
+    items = []
+    for g in guides:
+        items.append(
+            f'<a class="post-card" href="{html.escape(g["permalink"])}">'
+            '<div class="post-card-body">'
+            f'<div class="post-card-meta">{g["date"].strftime("%b %d, %Y")} · {g["minutes"]} min read</div>'
+            f'<h2>{html.escape(str(g["title"]))}</h2>'
+            f'<p>{html.escape(clip(str(g.get("excerpt") or ""), 180))}</p>'
+            '<span class="read-more">Read guide</span>'
+            "</div></a>"
+        )
+    grid = "\n".join(items)
+    body = f"""
+<div class="container">
+  <section class="hero">
+    <h1>Guides</h1>
+    <p class="hero-lead">Plain-English notes on Omegle names, sister sites, and what is not a chat.</p>
+  </section>
+  <div class="post-grid">{grid}</div>
+</div>
+"""
+    return layout(
+        "Omegle Guides",
+        body,
+        description="Guides to Omegle site names: omegle.com, omeglechat.online, omezy.net, and names that are not chat.",
+        canonical="/guides/",
+        json_ld=[breadcrumb([("Home", "/"), ("Guides", "/guides/")])],
+    )
+
+
 def build_sitemap(posts: list[dict]) -> str:
     rows = [("/", date.today())]
     rows.append((STORIES, posts[0]["date"] if posts else date.today()))
     rows.append(("/about/", date.today()))
+    rows.append(("/guides/", date.today()))
     rows.extend((p["permalink"], p["date"]) for p in posts)
     items = []
     for path, stamp in rows:
@@ -545,6 +708,7 @@ def main() -> int:
         print("No _posts/ — run sync-from-ngon-tinh.py first")
         return 1
     posts = load_posts()
+    guides = load_guides()
     link_series(posts)
     if SITE.exists():
         shutil.rmtree(SITE)
@@ -561,7 +725,11 @@ def main() -> int:
     write(SITE / "index.html", build_home(posts))
     write(SITE / "stories" / "index.html", build_archive(posts))
     write(SITE / "about" / "index.html", build_about())
-    write(SITE / "sitemap.xml", build_sitemap(posts))
+    write(SITE / "sitemap.xml", build_sitemap(posts + guides))
+    write(SITE / "guides" / "index.html", build_guide_index(guides))
+    for g in guides:
+        rel = g["permalink"].strip("/")
+        write(SITE / rel / "index.html", build_guide(g))
     write_legacy_redirects()
 
     by_slug = {p["slug"]: p for p in posts}
@@ -580,7 +748,7 @@ def publish_root() -> None:
     (ROOT / ".nojekyll").write_text("", encoding="utf-8")
     for name in ("index.html", "sitemap.xml"):
         shutil.copy2(SITE / name, ROOT / name)
-    for folder in ("stories", "about", "truyen"):
+    for folder in ("stories", "about", "guides", "truyen"):
         dest = ROOT / folder
         src = SITE / folder
         if dest.exists():
