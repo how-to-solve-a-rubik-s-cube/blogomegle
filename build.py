@@ -275,6 +275,9 @@ def layout(
   <link rel="canonical" href="{html.escape(canon)}">
   <link rel="alternate" hreflang="en" href="{html.escape(canon)}">
   <meta name="theme-color" content="#6b1838">
+  <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
   <meta property="og:site_name" content="{SITE_TITLE}">
   <meta property="og:title" content="{full_title}">
   <meta property="og:description" content="{desc}">
@@ -721,6 +724,9 @@ def main() -> int:
         src = ROOT / name
         if src.exists():
             shutil.copy2(src, SITE / name)
+    icon = ASSETS / "brand" / "favicon.ico"
+    if icon.exists():
+        shutil.copy2(icon, SITE / "favicon.ico")
 
     write(SITE / "index.html", build_home(posts))
     write(SITE / "stories" / "index.html", build_archive(posts))
@@ -746,7 +752,7 @@ def main() -> int:
 def publish_root() -> None:
     """GitHub Pages serves the branch root. Copy the built English site there."""
     (ROOT / ".nojekyll").write_text("", encoding="utf-8")
-    for name in ("index.html", "sitemap.xml"):
+    for name in ("index.html", "sitemap.xml", "favicon.ico"):
         shutil.copy2(SITE / name, ROOT / name)
     for folder in ("stories", "about", "guides", "truyen"):
         dest = ROOT / folder
