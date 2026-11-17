@@ -1,0 +1,25 @@
+---
+description: English love stories for blog.omeglechat.love — synthesize, never reprint
+alwaysApply: true
+---
+
+# Blog stories
+
+English is the only language for posts and for the blog interface.
+
+When adding a story:
+
+- Read a publicly told meeting or a public-domain motif first.
+- Write a new short story in original prose. New names, new dialogue, new ending.
+- Do not paste or closely reconstruct a book, article, or another site's story.
+- Characters are adults, 21 or older, including when the story looks backward.
+- One or two posts a day, in `_posts/`, then `python build.py`.
+- Keep the omeglechat.love facts accurate: browser chat, text voice or video, no signup, 18+, not the old Omegle company, not a dating app.
+
+```markdown
+# Bad
+Copying paragraphs from an article, or retelling a copyrighted plot scene by scene.
+
+# Good
+A library stranger and a second meeting on the sidewalk, told with new people and a new last scene.
+```

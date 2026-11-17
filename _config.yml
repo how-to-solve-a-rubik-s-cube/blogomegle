@@ -1,0 +1,14 @@
+# blog.omeglechat.love
+title: blog.omeglechat.love
+description: Original English love stories — strangers, second chances, and a happy ending.
+url: https://blog.omeglechat.love
+lang: en
+main_site: https://omeglechat.love
+chat_url: https://omeglechat.love/chat
+tagline: meet the strangers · love stories
+
+# AdSense — fill in when ready
+adsense:
+  client: ""
+  slots:
+    leaderboard: ""
