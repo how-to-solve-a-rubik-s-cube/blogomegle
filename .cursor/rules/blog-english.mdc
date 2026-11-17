@@ -14,6 +14,7 @@ When adding a story:
 - Do not paste or closely reconstruct a book, article, or another site's story.
 - Characters are adults, 21 or older, including when the story looks backward.
 - One or two posts a day, in `_posts/`, then `python build.py`.
+- Slugs and URLs are English only. Stories live at `/stories/the-story-title/`.
 - Keep the omeglechat.love facts accurate: browser chat, text voice or video, no signup, 18+, not the old Omegle company, not a dating app.
 
 ```markdown

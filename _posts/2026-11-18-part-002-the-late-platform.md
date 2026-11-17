@@ -2,8 +2,8 @@
 layout: post
 title: "The Late Platform"
 date: 2026-11-18
-slug: part-002-the-late-platform
-permalink: /truyen/part-002-the-late-platform/
+slug: the-late-platform
+permalink: /stories/the-late-platform/
 category: Love story
 category_slug: love-story
 series_name: "Late Night Love Stories"
@@ -11,13 +11,13 @@ series_slug: late-night-love-stories
 series_part: 2
 author: OmegleChat editors
 author_slug: editorial
-excerpt: "Nora is 29 and Elliot is 34. Five years ago they ended an engagement on this platform. Tonight the signal fails, and the train stops long enough for a true sentence."
+excerpt: "Nora, 29, and Elliot, 34, ended an engagement on a station platform. Five years later the train stops. An English love story."
 hero_image: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=1200&q=80"
 image: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=1200&q=80"
 couple: "Nora & Elliot"
 city: "Astoria"
 trope: "The same platform, years later"
-prev_part: /truyen/part-001-the-other-chair/
+prev_part: /stories/the-other-chair/
 next_part: ""
 tags:
   - "love story"

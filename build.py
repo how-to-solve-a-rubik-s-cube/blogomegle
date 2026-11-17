@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 import shutil
 from datetime import date, datetime
@@ -23,6 +24,7 @@ SITE_DESC = "Original love stories for omeglechat.love — strangers, second cha
 SITE_URL = "https://blog.omeglechat.love"
 MAIN_SITE = "https://omeglechat.love"
 CHAT_URL = "https://omeglechat.love/chat"
+STORIES = "/stories/"
 
 
 def parse_front_matter(text: str) -> tuple[dict, str]:
@@ -140,16 +142,16 @@ def load_posts() -> list[dict]:
         d = parse_date(meta.get("date") or path.name[:10])
         if d > today:
             continue
-        slug = meta.get("slug") or path.stem
-        permalink = meta.get("permalink") or f"/truyen/{slug}/"
-        if not str(permalink).endswith("/"):
-            permalink = str(permalink) + "/"
+        slug = slugify(str(meta.get("slug") or path.stem))
+        permalink = f"{STORIES}{slug}/"
+        words = len(re.findall(r"[A-Za-z0-9']+", body))
         posts.append(
             {
                 **meta,
                 "date": d,
                 "slug": slug,
                 "permalink": permalink,
+                "minutes": max(1, round(words / 220)),
                 "body_md": body,
                 "body_html": md_to_html(body),
                 "path": path,
@@ -159,10 +161,57 @@ def load_posts() -> list[dict]:
     return posts
 
 
-def layout(title: str, body: str, *, description: str | None = None, canonical: str = "/") -> str:
-    desc = html.escape(description or SITE_DESC)
-    full_title = html.escape(f"{title} · {SITE_TITLE}" if title != SITE_TITLE else SITE_TITLE)
+def clip(text: str, limit: int = 155) -> str:
+    text = " ".join(str(text).split())
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1].rsplit(" ", 1)[0].rstrip(".,;:")
+    return cut + "..."
+
+
+def slugify(value: str) -> str:
+    value = value.strip().lower()
+    value = re.sub(r"^part-\d+-", "", value)
+    value = re.sub(r"^tap-\d+-", "", value)
+    value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
+    return value or "story"
+
+
+def link_series(posts: list[dict]) -> None:
+    ordered = sorted(posts, key=lambda p: int(p.get("series_part") or 0))
+    for i, post in enumerate(ordered):
+        post["prev_url"] = ordered[i - 1]["permalink"] if i else ""
+        post["next_url"] = ordered[i + 1]["permalink"] if i + 1 < len(ordered) else ""
+        post["prev_title"] = ordered[i - 1]["title"] if i else ""
+        post["next_title"] = ordered[i + 1]["title"] if i + 1 < len(ordered) else ""
+
+
+def layout(
+    title: str,
+    body: str,
+    *,
+    description: str | None = None,
+    canonical: str = "/",
+    og_type: str = "website",
+    image: str | None = None,
+    json_ld: list | None = None,
+) -> str:
+    raw_desc = clip(description or SITE_DESC)
+    desc = html.escape(raw_desc)
+    full_title = html.escape(title if title == SITE_TITLE else f"{title} · {SITE_TITLE}")
     canon = SITE_URL.rstrip("/") + canonical
+    image_tags = ""
+    if image:
+        image_tags = f"""
+  <meta property="og:image" content="{html.escape(image)}">
+  <meta name="twitter:image" content="{html.escape(image)}">"""
+    ld = ""
+    if json_ld:
+        ld = "\n".join(
+            f'  <script type="application/ld+json">{json.dumps(block, ensure_ascii=False)}</script>'
+            for block in json_ld
+        )
+        ld = "\n" + ld
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -170,34 +219,40 @@ def layout(title: str, body: str, *, description: str | None = None, canonical: 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{full_title}</title>
   <meta name="description" content="{desc}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="{html.escape(canon)}">
+  <link rel="alternate" hreflang="en" href="{html.escape(canon)}">
   <meta name="theme-color" content="#6b1838">
   <meta property="og:site_name" content="{SITE_TITLE}">
   <meta property="og:title" content="{full_title}">
   <meta property="og:description" content="{desc}">
   <meta property="og:url" content="{html.escape(canon)}">
-  <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:type" content="{html.escape(og_type)}">
+  <meta property="og:locale" content="en_US">{image_tags}
+  <meta name="twitter:card" content="{"summary_large_image" if image else "summary"}">
+  <meta name="twitter:title" content="{full_title}">
+  <meta name="twitter:description" content="{desc}">{ld}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/blog.css">
 </head>
 <body>
+  <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/">
         <strong>blog.omeglechat.love</strong>
-        <small>meet the strangers · love stories</small>
+        <small>English love stories</small>
       </a>
-      <nav class="nav-links">
-        <a href="/truyen/">All stories</a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="/stories/">Stories</a>
         <a href="/about/">About</a>
         <a class="nav-cta" href="{CHAT_URL}" data-cta="chat" data-cta-placement="header">Start chat</a>
       </nav>
     </div>
   </header>
-  <main class="site-main">
+  <main class="site-main" id="content">
     {body}
   </main>
   <footer class="site-footer">
@@ -210,7 +265,7 @@ def layout(title: str, body: str, *, description: str | None = None, canonical: 
         <a href="{MAIN_SITE}">omeglechat.love</a>
         <a href="{CHAT_URL}">Start chat</a>
         <a href="/about/">About</a>
-        <a href="/truyen/">Archive</a>
+        <a href="/stories/">Stories</a>
       </div>
     </div>
     <div class="container footer-note">
@@ -235,7 +290,7 @@ def card_html(p: dict) -> str:
         meta_bits.append(str(p["city"]))
     meta = " · ".join(html.escape(x) for x in meta_bits)
     img = (
-        f'<img class="post-card-cover" src="{html.escape(cover)}" alt="" loading="lazy">'
+        f'<img class="post-card-cover" src="{html.escape(cover)}" alt="{title}" loading="lazy" width="640" height="400">'
         if cover
         else '<div class="post-card-cover" aria-hidden="true"></div>'
     )
@@ -246,7 +301,7 @@ def card_html(p: dict) -> str:
     <div class="post-card-meta">{meta}</div>
     <h2>{title}</h2>
     <p>{excerpt}</p>
-    <span class="read-more">Read story →</span>
+    <span class="read-more">Read story</span>
   </div>
 </a>
 """
@@ -267,9 +322,9 @@ def build_home(posts: list[dict]) -> str:
   </article>
   <article class="featured-side">
     <p class="post-card-meta">Also worth reading</p>
-    <h2><a href="{html.escape(side['permalink']) if side else '/truyen/'}">{html.escape(str(side['title']) if side else 'Story archive')}</a></h2>
+    <h2><a href="{html.escape(side['permalink']) if side else '/stories/'}">{html.escape(str(side['title']) if side else 'Story archive')}</a></h2>
     <p>{html.escape(str((side or {}).get('excerpt') or 'The full late-night love-story series.'))[:180]}</p>
-    <a class="btn btn-outline" href="/truyen/">See all</a>
+    <a class="btn btn-outline" href="/stories/">See all stories</a>
   </article>
 </section>
 """
@@ -277,30 +332,46 @@ def build_home(posts: list[dict]) -> str:
     body = f"""
 <div class="container">
   <section class="hero">
-    <h1>Love stories, written in English</h1>
-    <p class="hero-lead">Original short stories synthesized from meetings people have told in public — strangers, second chances, and a hello that arrives late. Adults only.</p>
+    <h1>English love stories</h1>
+    <p class="hero-lead">Short original stories about strangers, second chances, and the moment two adults recognize each other. Free to read. Adults only.</p>
     <div class="hero-actions">
-      <a class="btn btn-primary" href="/truyen/">Browse stories</a>
-      <a class="btn btn-outline" href="{CHAT_URL}">meet the strangers</a>
+      <a class="btn btn-primary" href="/stories/">Browse stories</a>
+      <a class="btn btn-outline" href="{CHAT_URL}">Meet a stranger</a>
     </div>
   </section>
   <div class="notice">Each story is an original synthesis. We do not reprint copyrighted books or copy articles from the web.</div>
 </div>
 {feat}
 <div class="container">
-  <h2 class="section-title">Latest</h2>
+  <h2 class="section-title">Latest stories</h2>
   <div class="pill-row">
-    <a class="pill active" href="/">All</a>
-    <a class="pill" href="/truyen/">Series</a>
+    <a class="pill active" href="/" aria-current="page">All</a>
+    <a class="pill" href="/stories/">Archive</a>
     <a class="pill" href="/about/">About</a>
   </div>
   <div class="post-grid">
     {grid}
   </div>
-  <p style="margin-top:1.25rem"><a href="/truyen/">See all {len(posts)} stories →</a></p>
+  <p class="archive-link"><a href="/stories/">See all {len(posts)} stories</a></p>
 </div>
 """
-    return layout(SITE_TITLE, body, canonical="/")
+    return layout(
+        "English Love Stories",
+        body,
+        description="Original English love stories about strangers, second chances, and late meetings. Read free short stories on blog.omeglechat.love.",
+        canonical="/",
+        json_ld=[
+            {
+                "@context": "https://schema.org",
+                "@type": "Blog",
+                "name": SITE_TITLE,
+                "description": SITE_DESC,
+                "url": SITE_URL + "/",
+                "inLanguage": "en",
+                "publisher": {"@type": "Organization", "name": "omeglechat.love", "url": MAIN_SITE},
+            }
+        ],
+    )
 
 
 def build_archive(posts: list[dict]) -> str:
@@ -308,61 +379,120 @@ def build_archive(posts: list[dict]) -> str:
     body = f"""
 <div class="container">
   <section class="hero">
-    <h1>Story archive</h1>
-    <p class="hero-lead">{len(posts)} English love stories · happy endings · late nights and second meetings.</p>
+    <h1>Love stories</h1>
+    <p class="hero-lead">{len(posts)} original English short stories. Happy endings, late nights, and second meetings.</p>
   </section>
-  <div class="ad-slot" aria-label="Advertisement"><div class="ad-placeholder">Advertisement</div></div>
   <div class="post-grid">{grid}</div>
 </div>
 """
-    return layout("Story archive", body, description="All love stories on blog.omeglechat.love", canonical="/truyen/")
+    return layout(
+        "Love Story Archive",
+        body,
+        description="Archive of original English love stories on blog.omeglechat.love. Strangers, reunions, and happy endings.",
+        canonical=STORIES,
+        json_ld=[breadcrumb([("Home", "/"), ("Stories", STORIES)])],
+    )
+
+
+def breadcrumb(items: list[tuple[str, str]]) -> dict:
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": i + 1,
+                "name": name,
+                "item": SITE_URL.rstrip("/") + path,
+            }
+            for i, (name, path) in enumerate(items)
+        ],
+    }
+
+
+def crumb_html(items: list[tuple[str, str]]) -> str:
+    parts = []
+    for i, (name, path) in enumerate(items):
+        if i == len(items) - 1:
+            parts.append(f'<li aria-current="page">{html.escape(name)}</li>')
+        else:
+            parts.append(f'<li><a href="{html.escape(path)}">{html.escape(name)}</a></li>')
+    return f'<nav class="breadcrumbs" aria-label="Breadcrumb"><ol>{"".join(parts)}</ol></nav>'
 
 
 def build_post(p: dict, by_slug: dict) -> str:
-    cover = p.get("hero_image") or ""
+    del by_slug
+    cover = str(p.get("hero_image") or "")
+    alt = html.escape(f"{p['title']}, a love story set in {p.get('city') or 'the city'}")
     cover_html = (
-        f'<div class="post-cover"><img src="{html.escape(cover)}" alt=""></div>'
+        f'<figure class="post-cover"><img src="{html.escape(cover)}" alt="{alt}" width="1200" height="675"></figure>'
         if cover
         else ""
     )
     prev_h = next_h = ""
-    prev = str(p.get("prev_part") or "").strip('"')
-    nxt = str(p.get("next_part") or "").strip('"')
-    if prev:
-        prev_h = f'<a href="{html.escape(prev)}">← Previous</a>'
-    if nxt:
-        next_h = f'<a href="{html.escape(nxt)}" style="margin-left:auto;text-align:right">Next →</a>'
+    if p.get("prev_url"):
+        prev_h = f'<a href="{html.escape(p["prev_url"])}"><span>Previous</span>{html.escape(str(p.get("prev_title") or ""))}</a>'
+    if p.get("next_url"):
+        next_h = f'<a class="next" href="{html.escape(p["next_url"])}"><span>Next</span>{html.escape(str(p.get("next_title") or ""))}</a>'
+    crumbs = [
+        ("Home", "/"),
+        ("Stories", STORIES),
+        (str(p["title"]), p["permalink"]),
+    ]
+    canon = SITE_URL.rstrip("/") + p["permalink"]
+    article_ld = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": str(p["title"]),
+        "description": clip(str(p.get("excerpt") or SITE_DESC)),
+        "datePublished": p["date"].isoformat(),
+        "dateModified": p["date"].isoformat(),
+        "inLanguage": "en",
+        "articleSection": "Love story",
+        "mainEntityOfPage": canon,
+        "url": canon,
+        "author": {"@type": "Organization", "name": "OmegleChat editors"},
+        "publisher": {"@type": "Organization", "name": "omeglechat.love", "url": MAIN_SITE},
+        "keywords": ", ".join(p.get("tags") or []),
+    }
+    if cover:
+        article_ld["image"] = cover
     body = f"""
 <article class="post-page container-narrow">
+  {crumb_html(crumbs)}
   <p class="post-kicker">{html.escape(str(p.get('series_name') or 'Love story'))} · Part {html.escape(str(p.get('series_part') or ''))}</p>
   <header class="post-header">
     <h1>{html.escape(str(p['title']))}</h1>
     <div class="post-meta">
       <time datetime="{p['date'].isoformat()}">{p['date'].strftime('%b %d, %Y')}</time>
-      <span class="sep">·</span>
+      <span class="sep" aria-hidden="true">·</span>
+      <span>{p['minutes']} min read</span>
+      <span class="sep" aria-hidden="true">·</span>
       <span>{html.escape(str(p.get('couple') or ''))}</span>
-      <span class="sep">·</span>
+      <span class="sep" aria-hidden="true">·</span>
       <span>{html.escape(str(p.get('city') or ''))}</span>
     </div>
   </header>
   {cover_html}
-  <div class="ad-slot" aria-label="Advertisement"><div class="ad-placeholder">Advertisement</div></div>
   <div class="post-body">
     {p['body_html']}
   </div>
-  <div class="chat-cta-box">
-    <h3>Still awake?</h3>
-    <p>If the story feels familiar, you can say hello to one stranger on omeglechat.love. Text, voice, or video. Adults only. No signup.</p>
-    <a class="btn btn-primary" href="{CHAT_URL}" data-cta="chat" data-cta-placement="post">Start a free chat</a>
-  </div>
-  <nav class="post-nav">{prev_h}{next_h}</nav>
+  <aside class="chat-cta-box">
+    <h2>Still awake?</h2>
+    <p>Say hello to one stranger on omeglechat.love. Text, voice, or video. Adults only. No account.</p>
+    <a class="btn btn-primary" href="{CHAT_URL}">Start a free chat</a>
+  </aside>
+  <nav class="post-nav" aria-label="More stories">{prev_h}{next_h}</nav>
 </article>
 """
     return layout(
         str(p["title"]),
         body,
-        description=str(p.get("excerpt") or SITE_DESC)[:160],
+        description=str(p.get("excerpt") or SITE_DESC),
         canonical=p["permalink"],
+        og_type="article",
+        image=cover or None,
+        json_ld=[article_ld, breadcrumb(crumbs)],
     )
 
 
@@ -373,10 +503,16 @@ def build_about() -> str:
   <p><strong>blog.omeglechat.love</strong> publishes original English love stories for omeglechat.love — late-night meetings, second chances, and a happy ending.</p>
   <p>We read meetings people have already told in public, then write a new story in our own words. We do not reprint books, lyrics, or articles.</p>
   <p>The characters are adults. The chat on <a href="{CHAT_URL}">omeglechat.love</a> is one stranger at a time, in the browser, with no account. We are not the old Omegle company.</p>
-  <p><a class="btn btn-primary" href="/truyen/">Browse stories</a></p>
+  <p><a class="btn btn-primary" href="/stories/">Browse stories</a></p>
 </article>
 """
-    return layout("About", body, canonical="/about/")
+    return layout(
+        "About",
+        body,
+        description="About blog.omeglechat.love, the English love-story site for omeglechat.love. Original stories. Adults only.",
+        canonical="/about/",
+        json_ld=[breadcrumb([("Home", "/"), ("About", "/about/")])],
+    )
 
 
 def write(path: Path, content: str) -> None:
@@ -385,11 +521,17 @@ def write(path: Path, content: str) -> None:
 
 
 def build_sitemap(posts: list[dict]) -> str:
-    urls = ["/", "/truyen/", "/about/"] + [p["permalink"] for p in posts]
+    rows = [("/", date.today())]
+    rows.append((STORIES, posts[0]["date"] if posts else date.today()))
+    rows.append(("/about/", date.today()))
+    rows.extend((p["permalink"], p["date"]) for p in posts)
     items = []
-    for u in urls:
+    for path, stamp in rows:
         items.append(
-            f"  <url><loc>{html.escape(SITE_URL.rstrip('/') + u)}</loc></url>"
+            "  <url>"
+            f"<loc>{html.escape(SITE_URL.rstrip('/') + path)}</loc>"
+            f"<lastmod>{stamp.isoformat()}</lastmod>"
+            "</url>"
         )
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -404,6 +546,7 @@ def main() -> int:
         print("No _posts/ — run sync-from-ngon-tinh.py first")
         return 1
     posts = load_posts()
+    link_series(posts)
     if SITE.exists():
         shutil.rmtree(SITE)
     SITE.mkdir(parents=True)
@@ -417,9 +560,10 @@ def main() -> int:
             shutil.copy2(src, SITE / name)
 
     write(SITE / "index.html", build_home(posts))
-    write(SITE / "truyen" / "index.html", build_archive(posts))
+    write(SITE / "stories" / "index.html", build_archive(posts))
     write(SITE / "about" / "index.html", build_about())
     write(SITE / "sitemap.xml", build_sitemap(posts))
+    write_legacy_redirects()
 
     by_slug = {p["slug"]: p for p in posts}
     for p in posts:
@@ -433,16 +577,43 @@ def main() -> int:
 
 
 def publish_root() -> None:
-    """GitHub Pages serves the branch root with Jekyll, which shows README.
-    Copy the built pages to the root and disable Jekyll."""
+    """GitHub Pages serves the branch root. Copy the built English site there."""
     (ROOT / ".nojekyll").write_text("", encoding="utf-8")
     for name in ("index.html", "sitemap.xml"):
         shutil.copy2(SITE / name, ROOT / name)
-    for folder in ("truyen", "about"):
+    for folder in ("stories", "about", "truyen"):
         dest = ROOT / folder
+        src = SITE / folder
         if dest.exists():
             shutil.rmtree(dest)
-        shutil.copytree(SITE / folder, dest)
+        if src.exists():
+            shutil.copytree(src, dest)
+
+
+def write_legacy_redirects() -> None:
+    """Old Vietnamese paths keep a canonical pointer to the English URL."""
+    targets = {
+        "/truyen/": STORIES,
+        "/truyen/part-001-the-other-chair/": "/stories/the-other-chair/",
+        "/truyen/part-002-the-late-platform/": "/stories/the-late-platform/",
+    }
+    for old, new in targets.items():
+        page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Moved</title>
+  <link rel="canonical" href="{SITE_URL.rstrip('/')}{new}">
+  <meta http-equiv="refresh" content="0; url={new}">
+  <script>location.replace({json.dumps(new)});</script>
+</head>
+<body>
+  <p>This page has moved. <a href="{html.escape(new)}">Continue to the story</a>.</p>
+</body>
+</html>
+"""
+        rel = old.strip("/")
+        write(SITE / rel / "index.html", page)
 
 
 if __name__ == "__main__":

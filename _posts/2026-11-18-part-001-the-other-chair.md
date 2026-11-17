@@ -2,8 +2,8 @@
 layout: post
 title: "The Other Chair"
 date: 2026-11-18
-slug: part-001-the-other-chair
-permalink: /truyen/part-001-the-other-chair/
+slug: the-other-chair
+permalink: /stories/the-other-chair/
 category: Love story
 category_slug: love-story
 series_name: "Late Night Love Stories"
@@ -11,14 +11,14 @@ series_slug: late-night-love-stories
 series_part: 1
 author: OmegleChat editors
 author_slug: editorial
-excerpt: "Ruth is 68. A librarian asks her to move for the children's hour. The only free chair is beside Paul, 71, and a book about bridges neither of them meant to share."
+excerpt: "Ruth, 68, is asked to change tables in a library. The only free chair is beside Paul, 71. An English love story about a second meeting."
 hero_image: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1200&q=80"
 image: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1200&q=80"
 couple: "Ruth & Paul"
 city: "Seattle"
 trope: "A stranger at the next chair"
 prev_part: ""
-next_part: /truyen/part-002-the-late-platform/
+next_part: /stories/the-late-platform/
 tags:
   - "love story"
   - "second meeting"
