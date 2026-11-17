@@ -427,8 +427,22 @@ def main() -> int:
         rel = p["permalink"].strip("/")
         write(SITE / rel / "index.html", build_post(p, by_slug))
 
+    publish_root()
     print(f"Built {len(posts)} posts → {SITE}")
     return 0
+
+
+def publish_root() -> None:
+    """GitHub Pages serves the branch root with Jekyll, which shows README.
+    Copy the built pages to the root and disable Jekyll."""
+    (ROOT / ".nojekyll").write_text("", encoding="utf-8")
+    for name in ("index.html", "sitemap.xml"):
+        shutil.copy2(SITE / name, ROOT / name)
+    for folder in ("truyen", "about"):
+        dest = ROOT / folder
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(SITE / folder, dest)
 
 
 if __name__ == "__main__":
