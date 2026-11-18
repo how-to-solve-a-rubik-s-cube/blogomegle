@@ -6,7 +6,7 @@ import html
 import json
 import re
 import shutil
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 try:
@@ -176,6 +176,14 @@ def md_to_html(md: str) -> str:
     return "\n".join(out)
 
 
+# Vietnam has no daylight saving. A fixed offset stays correct on Windows and on GitHub runners.
+VIETNAM = timezone(timedelta(hours=7))
+
+
+def today_local() -> date:
+    return datetime.now(VIETNAM).date()
+
+
 def parse_date(v) -> date:
     if isinstance(v, datetime):
         return v.date()
@@ -186,7 +194,7 @@ def parse_date(v) -> date:
 
 def load_posts() -> list[dict]:
     posts = []
-    today = date.today()
+    today = today_local()
     for path in sorted(POSTS_DIR.glob("*.md")):
         meta, body = parse_front_matter(path.read_text(encoding="utf-8"))
         if not meta.get("title"):
@@ -230,12 +238,16 @@ def slugify(value: str) -> str:
 
 
 def link_series(posts: list[dict]) -> None:
-    ordered = sorted(posts, key=lambda p: int(p.get("series_part") or 0))
-    for i, post in enumerate(ordered):
-        post["prev_url"] = ordered[i - 1]["permalink"] if i else ""
-        post["next_url"] = ordered[i + 1]["permalink"] if i + 1 < len(ordered) else ""
-        post["prev_title"] = ordered[i - 1]["title"] if i else ""
-        post["next_title"] = ordered[i + 1]["title"] if i + 1 < len(ordered) else ""
+    groups: dict[str, list[dict]] = {}
+    for post in posts:
+        groups.setdefault(str(post.get("series_slug") or ""), []).append(post)
+    for group in groups.values():
+        ordered = sorted(group, key=lambda p: int(p.get("series_part") or 0))
+        for i, post in enumerate(ordered):
+            post["prev_url"] = ordered[i - 1]["permalink"] if i else ""
+            post["next_url"] = ordered[i + 1]["permalink"] if i + 1 < len(ordered) else ""
+            post["prev_title"] = ordered[i - 1]["title"] if i else ""
+            post["next_title"] = ordered[i + 1]["title"] if i + 1 < len(ordered) else ""
 
 
 def layout(
@@ -581,7 +593,7 @@ def load_guides() -> list[dict]:
     if not folder.exists():
         return []
     guides = []
-    today = date.today()
+    today = today_local()
     for path in sorted(folder.glob("*.md")):
         meta, body = parse_front_matter(path.read_text(encoding="utf-8"))
         if not meta.get("title"):
@@ -685,10 +697,11 @@ def build_guide_index(guides: list[dict]) -> str:
 
 
 def build_sitemap(posts: list[dict]) -> str:
-    rows = [("/", date.today())]
-    rows.append((STORIES, posts[0]["date"] if posts else date.today()))
-    rows.append(("/about/", date.today()))
-    rows.append(("/guides/", date.today()))
+    today = today_local()
+    rows = [("/", today)]
+    rows.append((STORIES, posts[0]["date"] if posts else today))
+    rows.append(("/about/", today))
+    rows.append(("/guides/", today))
     rows.extend((p["permalink"], p["date"]) for p in posts)
     items = []
     for path, stamp in rows:

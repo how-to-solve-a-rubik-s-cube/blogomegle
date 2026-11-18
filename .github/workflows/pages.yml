@@ -3,10 +3,13 @@ name: Publish blog
 on:
   push:
     branches: [main]
+  schedule:
+    # 01:00 UTC is 08:00 in Vietnam, and that UTC date is the same calendar day.
+    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -23,6 +26,18 @@ jobs:
         with:
           python-version: "3.12"
       - run: python build.py
+      - name: Save the stories that are due
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html sitemap.xml .nojekyll favicon.ico stories about guides truyen
+          if git diff --cached --quiet; then
+            echo "No newly due pages."
+          else
+            git commit -m "Publish the love stories due today"
+            git push
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
