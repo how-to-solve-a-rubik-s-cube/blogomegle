@@ -23,7 +23,7 @@ SITE_TITLE = "blog.omeglechat.love"
 SITE_DESC = "Original love stories for omeglechat.love — strangers, second chances, and a happy ending."
 SITE_URL = "https://blog.omeglechat.love"
 MAIN_SITE = "https://omeglechat.love"
-CHAT_URL = "https://omeglechat.love/chat"
+CHAT_URL = "https://omeglechat.love/"
 STORIES = "/stories/"
 
 
